@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import window_function as wf
 import anomaly_detection as ad
+from filter import low_pass_filter
 from concurrent.futures import ThreadPoolExecutor
 
 mpl.rcParams['axes.xmargin'] = 0
@@ -17,7 +18,7 @@ audioFiles = librosa.util.find_files(audioFileDir)
 audioData = [librosa.load(audioFile, sr=4800) for audioFile in audioFiles]
 
 # plot audio waveforms and rms on the waveforms for each audio file at a sheet
-fig, axs = plt.subplots(9, len(audioData), figsize=(20, 20))
+fig, axs = plt.subplots(2, len(audioData), figsize=(20, 20))
 for i, (y, sr) in enumerate(audioData):
     onset_env = librosa.onset.onset_strength(y=y, sr=sr)
     y = librosa.effects.trim(y)[0]
@@ -26,7 +27,7 @@ for i, (y, sr) in enumerate(audioData):
     beat_time = librosa.frames_to_time(beat, sr=sr)
     normalize_wave = np.zeros(y.size)
     playtime = y.size / sr
-    window_size = 20
+    window_size = int(sr * 0.004)
     chord_wave = np.zeros(y.size)
 
     chroma = librosa.feature.chroma_stft(y=y, sr=sr)
@@ -52,7 +53,7 @@ for i, (y, sr) in enumerate(audioData):
         
         x = np.arange(y.size)
         for j in range(len(beat_time) - 1):
-            sigma = sr * (beat_time[j + 1] - beat_time[j]) / 9
+            sigma = sr * (beat_time[j + 1] - beat_time[j]) / 8
             myu = beat_time[j] * sr
             normalize_wave += np.exp(-(((x - myu) / sigma) ** 2) / 2)
 
@@ -85,6 +86,7 @@ for i, (y, sr) in enumerate(audioData):
         global rms
         global rms_sst
         rms = librosa.feature.rms(y=y)[0]
+        rms = rms / np.max(rms)
         rms = np.nan_to_num(rms)
         rms_sst = ad.sst(rms, window_size)
         rms_sst = rms_sst / np.max(rms_sst)
@@ -124,55 +126,36 @@ for i, (y, sr) in enumerate(audioData):
         executor.submit(calc_rms)
         executor.submit(calc_spectral_centroid)
         executor.submit(calc_spectral_bandwidth)
-    wave_sum = zcr_sst + spectral_rolloff_sst + rms_sst + spectral_centroid_sst + spectral_bandwidth_sst
-    wave_sum_sst = ad.sst(wave_sum, 10)
     
     for i in range(zcr_sst.size):
-        zcr_sst[i] *= normalize_wave[i * normalize_wave.size // zcr_sst.size]
+        zcr_sst[i] *= normalize_wave[i * normalize_wave.size // zcr_sst.size] * rms[i * rms.size // zcr_sst.size]
     for i in range(spectral_rolloff_sst.size):
-        spectral_rolloff_sst[i] *= normalize_wave[i * normalize_wave.size // spectral_rolloff_sst.size]
+        spectral_rolloff_sst[i] *= normalize_wave[i * normalize_wave.size // spectral_rolloff_sst.size] * rms[i * rms.size // spectral_rolloff_sst.size]
     for i in range(rms_sst.size):
-        rms_sst[i] *= normalize_wave[i * normalize_wave.size // rms_sst.size]
+        rms_sst[i] *= normalize_wave[i * normalize_wave.size // rms_sst.size] * rms[i * rms.size // rms_sst.size]
     for i in range(spectral_centroid_sst.size):
-        spectral_centroid_sst[i] *= normalize_wave[i * normalize_wave.size // spectral_centroid_sst.size]
+        spectral_centroid_sst[i] *= normalize_wave[i * normalize_wave.size // spectral_centroid_sst.size] * rms[i * rms.size // spectral_centroid_sst.size]
     for i in range(spectral_bandwidth_sst.size):
-        spectral_bandwidth_sst[i] *= normalize_wave[i * normalize_wave.size // spectral_bandwidth_sst.size]
+        spectral_bandwidth_sst[i] *= normalize_wave[i * normalize_wave.size // spectral_bandwidth_sst.size] * rms[i * rms.size // spectral_bandwidth_sst.size]
     
+    ### メロディ変化点検出
+    # 各パラメータの変化点検出結果を合成
+    wave_sum = zcr_sst + spectral_rolloff_sst + rms_sst + spectral_centroid_sst + spectral_bandwidth_sst
+    wave_sum = wave_sum / np.max(wave_sum) # 正規化
+    wave_sum_sst = ad.sst(wave_sum, window_size // 2) # 合成した変化点検出結果に対して異常検知
+    # ビートごとに山が来る正規分布の列で作られた波との積を取る
+    for i in range(wave_sum_sst.size):
+        wave_sum_sst[i] *= normalize_wave[i * normalize_wave.size // wave_sum_sst.size]
+    wave_sum_sst = low_pass_filter(wave_sum_sst, sr) # ローパスフィルタ
+    wave_sum_sst = wave_sum_sst / np.max(wave_sum_sst) * 2 
+    wave_sum_sst = np.exp(wave_sum_sst) # 指数関数で変化点を増幅
+    wave_sum_sst = wave_sum_sst / np.max(wave_sum_sst) # 正規化
 
     axs[0].set_title("audio waveform")
     axs[0].plot(np.arange(len(y)) / sr, y)
-    for b in beat_time:
-        axs[0].axvline(b, color='r')
 
-    axs[1].set_title("chroma")
-    axs[1].imshow(chroma, aspect='auto', origin='lower', cmap='viridis')
-
-    axs[2].set_title("Zero Crossing Rate")
-    axs[2].plot(np.arange(len(zcr)) / len(zcr) * len(y) / sr, zcr)
-    axs[2].plot(np.arange(len(zcr_sst)) / len(zcr_sst) * len(y) / sr, zcr_sst)
-
-    axs[3].set_title("MFCC")
-    axs[3].imshow(mfcc, aspect='auto', origin='lower', cmap='viridis')
-
-    axs[4].set_title("spectral_rolloff")
-    axs[4].plot(np.arange(len(spectral_rolloff)) / len(spectral_rolloff) * len(y) / sr, spectral_rolloff)
-    axs[4].plot(np.arange(len(spectral_rolloff_sst)) / len(spectral_rolloff_sst) * len(y) / sr, spectral_rolloff_sst)
-
-    axs[5].set_title("rms")
-    axs[5].plot(np.arange(len(rms)) / len(rms) * len(y) / sr, rms)
-    axs[5].plot(np.arange(len(rms_sst)) / len(rms_sst) * len(y) / sr, rms_sst)
-
-    axs[6].set_title("spectral_centroid")
-    axs[6].plot(np.arange(len(spectral_centroid)) / len(spectral_centroid) * len(y) / sr, spectral_centroid)
-    axs[6].plot(np.arange(len(spectral_centroid_sst)) / len(spectral_centroid_sst) * len(y) / sr, spectral_centroid_sst)
-
-    axs[7].set_title("spectral_bandwidth")
-    axs[7].plot(np.arange(len(spectral_bandwidth)) / len(spectral_bandwidth) * len(y) / sr, spectral_bandwidth)
-    axs[7].plot(np.arange(len(spectral_bandwidth_sst)) / len(spectral_bandwidth_sst) * len(y) / sr, spectral_bandwidth_sst)
-
-    axs[8].set_title("wave_sum")
-    axs[8].plot(np.arange(len(wave_sum)) / len(wave_sum) * len(y) / sr, wave_sum)
-    axs[8].plot(np.arange(len(wave_sum_sst)) / len(wave_sum_sst) * len(y) / sr, wave_sum_sst)
+    axs[1].set_title("melody change point")
+    axs[1].plot(np.arange(len(wave_sum_sst)) / len(wave_sum_sst) * len(y) / sr, wave_sum_sst)
     
 plt.tight_layout()
 plt.show()
