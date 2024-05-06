@@ -3,11 +3,9 @@ from librosa.feature.rhythm import tempo
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-import window_function as wf
-import anomaly_detection as ad
-from filter import low_pass_filter
+from util import anomaly_detection as ad, window_function as wf, diff
+from util.filter import low_pass_filter
 from concurrent.futures import ThreadPoolExecutor
-import diff
 
 mpl.rcParams['axes.xmargin'] = 0
 mpl.rcParams['axes.ymargin'] = 0

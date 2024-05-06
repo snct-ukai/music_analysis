@@ -1,11 +1,9 @@
 import librosa
 from librosa.feature.rhythm import tempo
 import numpy as np
-import window_function as wf
-import anomaly_detection as ad
-from filter import low_pass_filter
+from util import window_function as wf, anomaly_detection as ad, diff
+from util.filter import low_pass_filter
 from concurrent.futures import ThreadPoolExecutor
-import diff
 from typing import Tuple
 
 def composition_detector(y : np.ndarray, sr : int) -> Tuple[np.ndarray, float]:
