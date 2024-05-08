@@ -3,8 +3,10 @@ from librosa.feature.rhythm import tempo
 import numpy as np
 from util import window_function as wf, anomaly_detection as ad, diff
 from util.filter import low_pass_filter
-from concurrent.futures import ThreadPoolExecutor
+from concurrent import futures
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from typing import Tuple
+from freq_analyze import normalize_wave as nw, zcr, rms as rm, spectral_rolloff as sro, spectral_centroid as sc, spectral_bandwidth as sb
 
 def composition_detector(y : np.ndarray, sr : int) -> Tuple[np.ndarray, float]:
     onset_env = librosa.onset.onset_strength(y=y, sr=sr)
@@ -14,64 +16,24 @@ def composition_detector(y : np.ndarray, sr : int) -> Tuple[np.ndarray, float]:
     normalize_wave = np.zeros(y.size)
     window_size = int(sr * 0.004)
 
-    def calc_normalize_wave() -> np.ndarray:
-        normalize_wave = np.zeros(y.size)
-        x = np.arange(y.size)
-        for j in range(len(beat_time) - 1):
-            sigma = sr * (beat_time[j + 1] - beat_time[j]) / 8
-            myu = beat_time[j] * sr
-            normalize_wave += np.exp(-(((x - myu) / sigma) ** 2) / 2)
-        return normalize_wave
-
-    def calc_zcr_sst() -> np.ndarray:
-        zcr = librosa.feature.zero_crossing_rate(y=y)[0]
-        zcr = np.nan_to_num(zcr)
-        zcr_sst = ad.sst(zcr, window_size)
-        zcr_sst = zcr_sst / np.max(zcr_sst)
-        return zcr_sst
-
-    def calc_spectral_rolloff_sst() -> np.ndarray:
-        spectral_rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr)[0]
-        spectral_rolloff = spectral_rolloff / np.max(spectral_rolloff)
-        spectral_rolloff = np.nan_to_num(spectral_rolloff)
-        spectral_rolloff_sst = ad.sst(spectral_rolloff, window_size)
-        spectral_rolloff_sst = spectral_rolloff_sst / np.max(spectral_rolloff_sst)
-        return spectral_rolloff_sst
-
-    def calc_rms_sst() -> np.ndarray:
-        rms = librosa.feature.rms(y=y)[0]
-        rms = rms / np.max(rms)
-        rms = np.nan_to_num(rms)
-        rms_sst = ad.sst(rms, window_size)
-        rms_sst = rms_sst / np.max(rms_sst)
-        return [rms, rms_sst]
-
-    def calc_spectral_centroid_sst() -> np.ndarray:
-        spectral_centroid = librosa.feature.spectral_centroid(y=y, sr=sr)[0]
-        spectral_centroid = spectral_centroid / np.max(spectral_centroid)
-        spectral_centroid = np.nan_to_num(spectral_centroid)
-        spectral_centroid_sst = ad.sst(spectral_centroid, window_size)
-        spectral_centroid_sst = spectral_centroid_sst / np.max(spectral_centroid_sst)
-        return spectral_centroid_sst
-
-    def calc_spectral_bandwidth_sst() -> np.ndarray:
-        global spectral_bandwidth
-        global spectral_bandwidth_sst
-        spectral_bandwidth = librosa.feature.spectral_bandwidth(y=y, sr=sr)[0]
-        spectral_bandwidth = spectral_bandwidth / np.max(spectral_bandwidth)
-        spectral_bandwidth = np.nan_to_num(spectral_bandwidth)
-        spectral_bandwidth_sst = ad.sst(spectral_bandwidth, window_size)
-        spectral_bandwidth_sst = spectral_bandwidth_sst / np.max(spectral_bandwidth_sst)
-        return spectral_bandwidth_sst
+    future_list = []
 
     with ThreadPoolExecutor() as executor:
-        normalize_wave = executor.submit(calc_normalize_wave)
-        zcr_sst = executor.submit(calc_zcr_sst)
-        spectral_rolloff_sst = executor.submit(calc_spectral_rolloff_sst)
-        rms_res = executor.submit(calc_rms_sst)
-        spectral_centroid_sst = executor.submit(calc_spectral_centroid_sst)
-        spectral_bandwidth_sst = executor.submit(calc_spectral_bandwidth_sst)
-    
+        normalize_wave = executor.submit(nw.calc, y, sr, beat_time)
+        future_list.append(normalize_wave)
+        zcr_sst = executor.submit(zcr.calc, y, sr)
+        future_list.append(zcr_sst)
+        spectral_rolloff_sst = executor.submit(sro.calc, y, sr)
+        future_list.append(spectral_rolloff_sst)
+        rms_res = executor.submit(rm.calc, y, sr)
+        future_list.append(rms_res)
+        spectral_centroid_sst = executor.submit(sc.calc, y, sr)
+        future_list.append(spectral_centroid_sst)
+        spectral_bandwidth_sst = executor.submit(sb.calc, y, sr)
+        future_list.append(spectral_bandwidth_sst)
+
+        _ = futures.wait(future_list)
+
     normalize_wave = normalize_wave.result()
     zcr_sst = zcr_sst.result()
     spectral_rolloff_sst = spectral_rolloff_sst.result()
@@ -83,13 +45,13 @@ def composition_detector(y : np.ndarray, sr : int) -> Tuple[np.ndarray, float]:
     rms_sst = rms_res[1]
 
     for i in range(zcr_sst.size):
-        zcr_sst[i] *= normalize_wave[i * normalize_wave.size // zcr_sst.size] * rms[i * rms.size // zcr_sst.size]
+        zcr_sst[i] *= normalize_wave[int(i * normalize_wave.size // zcr_sst.size)] * rms[int(i * rms.size // zcr_sst.size)]
     for i in range(spectral_rolloff_sst.size):
-        spectral_rolloff_sst[i] *= normalize_wave[i * normalize_wave.size // spectral_rolloff_sst.size] * rms[i * rms.size // spectral_rolloff_sst.size]
+        spectral_rolloff_sst[i] *= normalize_wave[int(i * normalize_wave.size // spectral_rolloff_sst.size)] * rms[int(i * rms.size // spectral_rolloff_sst.size)]
     for i in range(rms_sst.size):
-        rms_sst[i] *= normalize_wave[i * normalize_wave.size // rms_sst.size] * rms[i * rms.size // rms_sst.size]
+        rms_sst[i] *= normalize_wave[int(i * normalize_wave.size // rms_sst.size)] * rms[int(i * rms.size // rms_sst.size)]
     for i in range(spectral_centroid_sst.size):
-        spectral_centroid_sst[i] *= normalize_wave[i * normalize_wave.size // spectral_centroid_sst.size] * rms[i * rms.size // spectral_centroid_sst.size]
+        spectral_centroid_sst[i] *= normalize_wave[int(i * normalize_wave.size // spectral_centroid_sst.size)] * rms[int(i * rms.size // spectral_centroid_sst.size)]
     for i in range(spectral_bandwidth_sst.size):
         spectral_bandwidth_sst[i] *= normalize_wave[i * normalize_wave.size // spectral_bandwidth_sst.size] * rms[i * rms.size // spectral_bandwidth_sst.size]
     
