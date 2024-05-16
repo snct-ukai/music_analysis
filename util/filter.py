@@ -6,3 +6,10 @@ def low_pass_filter(data, cutoff):
     G = F.copy()
     G[cutoff:N-cutoff] = 0
     return np.fft.ifft(G).real
+
+def high_pass_filter(data, cutoff):
+    N = len(data)
+    F = np.fft.fft(data)
+    G = F.copy()
+    G[N-cutoff:] = 0
+    return np.fft.ifft(G).real
