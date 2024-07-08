@@ -3,12 +3,6 @@ import librosa
 import soundfile as sf
 import matplotlib.pyplot as plt
 
-# 音声ファイルの読み込み
-audioFileDir = "./wav"
-# get audio file paths
-audioFiles = librosa.util.find_files(audioFileDir)
-filepath = audioFiles[0]
-
 def segment_separate(filepath):
     y, sr = librosa.load(filepath)
 
@@ -18,7 +12,7 @@ def segment_separate(filepath):
 
     # 1小節の長さを計算
     beats_per_measure = 4  # 4拍子として
-    measure_length = int((tempo / 60) * sr * beats_per_measure)
+    measure_length = int((tempo * sr) / 60 * beats_per_measure)
 
     # フレームごとのエネルギーを計算
     hop_length = 512
@@ -91,8 +85,7 @@ def segment_separate(filepath):
     combined_score = (
         np.abs(energy_diff) +
         np.abs(zero_crossings_diff) +
-        np.abs(spectral_flux_diff) +
-        np.abs(melody_contour_diff)
+        np.abs(spectral_flux_diff)
     )
 
     # 局所的な平均と標準偏差を計算
@@ -101,25 +94,25 @@ def segment_separate(filepath):
     local_std = np.sqrt(np.convolve((combined_score - local_mean)**2, np.ones(window_size) / window_size, mode='same'))
 
     # 動的な閾値を設定
-    n = 2.75
+    n = 2.
     dynamic_threshold  = local_mean + n * local_std
 
     # 変化点の検出
     change_points = np.where(combined_score > dynamic_threshold)[0]
 
     # 始めの2小節は変化点として検出されやすいので除外
-    change_points = change_points[change_points > 2 * measure_length / hop_length]
+    change_points = change_points[change_points > measure_length / hop_length]
 
-    change_points_value = np.abs(combined_score[change_points] - local_mean[change_points])
+    #change_points_value = np.abs(combined_score[change_points] - local_mean[change_points])
 
-    # change_pointsの配列で、もしwindow_sizeにおさまる範囲に複数の候補がある場合、の最大値のみ残す、1フレームずつずらす
-    for i in range(len(change_points) - window_size):
-        if np.all(change_points_value[i:i+window_size] < change_points_value[i+1:i+window_size+1]):
-            change_points[i] = 0
+    ## change_pointsの配列で、もしwindow_sizeにおさまる範囲に複数の候補がある場合、の最大値のみ残す、1フレームずつずらす
+    #for i in range(len(change_points) - window_size):
+    #    if np.all(change_points_value[i:i+window_size] < change_points_value[i+1:i+window_size+1]):
+    #        change_points[i] = 0
 
     # 大きい順に上位50個を取得
-    change_points = change_points[np.argsort(change_points_value)[::-1]][:100]
-    change_points = np.sort(change_points)
+    #change_points = change_points[np.argsort(change_points_value)[::-1]][:400]
+    #change_points = np.sort(change_points)
 
     # 変化点をサンプル単位に変換
     change_samples = change_points * hop_length
@@ -128,7 +121,7 @@ def segment_separate(filepath):
     change_samples = np.concatenate(([0], change_samples, [len(y)]))
 
     # 最小セグメント長をサンプル単位で設定
-    min_segment_length = measure_length / 2
+    min_segment_length = measure_length // 2
 
     # 短いセグメントを統合するロジック
     from util.matrix import cos_sim
@@ -181,36 +174,45 @@ def segment_separate(filepath):
 
     # 最後の変化点を追加
     filtered_change_samples.append(change_samples[-1])
+    
+    if __name__ == '__main__':
+        import os
+        filename = os.path.basename(filepath)
+        # 拡張子を削除
+        filename = os.path.splitext(filename)[0]
+        dirname = f'./output2/{filename}'
+        if(os.path.exists(dirname) == True):
+            # delete files
+            for file in os.listdir(dirname):
+                os.remove(os.path.join(dirname, file))
+        os.makedirs(dirname, exist_ok=True)
+        # セグメントごとにファイルに保存
+        for i in range(len(filtered_change_samples) - 1):
+            start_sample = filtered_change_samples[i]
+            end_sample = filtered_change_samples[i + 1]
+            segment = y[start_sample:end_sample]
 
-    import os
-    filename = os.path.basename(filepath)
-    # 拡張子を削除
-    filename = os.path.splitext(filename)[0]
-    dirname = f'./output2/{filename}'
-    if(os.path.exists(dirname) == True):
-        # delete files
-        for file in os.listdir(dirname):
-            os.remove(os.path.join(dirname, file))
-    os.makedirs(dirname, exist_ok=True)
+            output_filename = f'{dirname}/segment_{i+1}.wav'
+            sf.write(output_filename, segment, sr)
+            print(f'Saved {output_filename}')
 
-    # セグメントごとにファイルに保存
-    for i in range(len(filtered_change_samples) - 1):
-        start_sample = filtered_change_samples[i]
-        end_sample = filtered_change_samples[i + 1]
-        segment = y[start_sample:end_sample]
+        # 結果をプロット
+        plt.figure(figsize=(14, 5))
+        plt.plot(combined_score, label='Combined Score')
+        plt.plot(dynamic_threshold, label='Dynamic Threshold', linestyle='dashed', color='red')
+        plt.plot(local_mean, label='Local Mean', linestyle='dashed', color='green')
+        plt.vlines(change_points, 0, max(combined_score), color='r', linestyle='dashed')
+        plt.vlines(use_change_points, 0, max(combined_score), color='g')
+        plt.legend()
+        plt.savefig(f'{dirname}/result.png', format='png', dpi=300)
 
-        output_filename = f'{dirname}/segment_{i+1}.wav'
-        sf.write(output_filename, segment, sr)
-        print(f'Saved {output_filename}')
+    return np.array(filtered_change_samples) / sr
 
-    # 結果をプロット
-    plt.figure(figsize=(14, 5))
-    plt.plot(combined_score, label='Combined Score')
-    plt.plot(dynamic_threshold, label='Dynamic Threshold', linestyle='dashed', color='red')
-    plt.plot(local_mean, label='Local Mean', linestyle='dashed', color='green')
-    plt.vlines(change_points, 0, max(combined_score), color='r', linestyle='dashed')
-    plt.vlines(use_change_points, 0, max(combined_score), color='g')
-    plt.legend()
-    plt.savefig(f'{dirname}/result.png', format='png', dpi=300)
-
-    return filtered_change_samples / sr
+if __name__ == '__main__':
+    # 音声ファイルの読み込み
+    audioFileDir = "./wav"
+    # get audio file paths
+    audioFiles = librosa.util.find_files(audioFileDir)
+    filepath = audioFiles[0]
+    segment_time = segment_separate(filepath)
+    print(segment_time)

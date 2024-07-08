@@ -1,5 +1,5 @@
 import numpy as np
-import chord_vector as cv
+import chord.chord_vector as cv
 
 def chord_estimate(chroma : np.ndarray, tempo : int, playtime : int):
     CPB = int(60 * len(chroma[0]) / (tempo * playtime))
@@ -10,3 +10,9 @@ def chord_estimate(chroma : np.ndarray, tempo : int, playtime : int):
     chord_estimation = np.argmax(chord_matching_score, axis=0)
     chord_name = [cv.chord_dic[chord] for chord in chord_estimation]
     return chord_name
+
+def chord_root_tone_estimate(chroma: np.ndarray):
+    chord_matching_score = np.dot(cv.templates, chroma)
+    chord_estimation = np.argmax(chord_matching_score, axis=0)
+    chord_root_tone = chord_estimation % 12
+    return chord_root_tone
