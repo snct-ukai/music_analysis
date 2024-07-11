@@ -31,7 +31,9 @@ def calc_distribution(data_array, sr, is_raw = False) -> np.ndarray:
     zcr_array = [librosa.feature.zero_crossing_rate(y=data) for data in data_array]
 
     length_feat = np.array([len(data) for data in data_array])
-    time_feat = np.array([i / sr for i in length_feat])
+    time_feat = np.cumsum(length_feat) / sr
+    time_feat = time_feat - time_feat[0]
+    time_feat = time_feat / time_feat[-1]
     
     feat_value_array = []
     for i, data in enumerate(data_array):
@@ -61,9 +63,11 @@ def calc_distribution(data_array, sr, is_raw = False) -> np.ndarray:
     if is_raw:
         return feat_value_array
     
-    for i in range(feat_value_array.shape[1]):
+    for i in range(feat_value_array.shape[1] - 1):
         feat_value_array[:, i] = (feat_value_array[:, i] - np.mean(feat_value_array[:, i])) / np.std(feat_value_array[:, i])
-
+    
+    dist = np.linalg.norm(feat_value_array[:, :-1], axis=1)
+    feat_value_array[:, :-1] = feat_value_array[:, :-1] * (np.max(dist) ** 2)
     return np.array(feat_value_array)
 
 if __name__ == "__main__":
@@ -81,43 +85,45 @@ if __name__ == "__main__":
     feat_value_array = calc_distribution(segments, sr)
 
     reducer = umap.UMAP(n_components=2, random_state=42)
-    feat_value_array_umap_o_time = reducer.fit_transform(feat_value_array[:6])
     feat_value_array_umap = reducer.fit_transform(feat_value_array)
+    feat_rms = feat_value_array[:, [0, 1, 8]]
+    feat_f0 = feat_value_array[:, [2, 3, 8]]
+    feat_sb = feat_value_array[:, [4, 5, 8]]
+    feat_zcr = feat_value_array[:, [6, 7, 8]]
+
+    feat_rms = reducer.fit_transform(feat_rms)
+    feat_f0 = reducer.fit_transform(feat_f0)
+    feat_sb = reducer.fit_transform(feat_sb)
+    feat_zcr = reducer.fit_transform(feat_zcr)
 
     annotaion = [f"{i}" for i in range(len(feat_value_array))]
     
     fig = plt.figure()
     ax_1 = fig.add_subplot(231)
-    ax_1.scatter(feat_value_array[:, 0], feat_value_array[:, 1])
+    ax_1.scatter(feat_rms[:, 0], feat_rms[:, 1])
     ax_1.set_title('RMS')
     for i, txt in enumerate(annotaion):
-        ax_1.annotate(txt, (feat_value_array[i, 0], feat_value_array[i, 1]))
+        ax_1.annotate(txt, (feat_rms[i, 0], feat_rms[i, 1]))
 
     ax_2 = fig.add_subplot(232)
-    ax_2.scatter(feat_value_array[:, 2], feat_value_array[:, 3])
+    ax_2.scatter(feat_f0[:, 0], feat_f0[:, 1])
     ax_2.set_title('F0')
     for i, txt in enumerate(annotaion):
-        ax_2.annotate(txt, (feat_value_array[i, 2], feat_value_array[i, 3]))
+        ax_2.annotate(txt, (feat_f0[i, 0], feat_f0[i, 1]))
 
     ax_3 = fig.add_subplot(233)
-    ax_3.scatter(feat_value_array[:, 4], feat_value_array[:, 5])
+    ax_3.scatter(feat_sb[:, 0], feat_sb[:, 1])
     ax_3.set_title('Spectral Bandwidth')
     for i, txt in enumerate(annotaion):
-        ax_3.annotate(txt, (feat_value_array[i, 4], feat_value_array[i, 5]))
+        ax_3.annotate(txt, (feat_sb[i, 0], feat_sb[i, 1]))
 
     ax_4 = fig.add_subplot(234)
-    ax_4.scatter(feat_value_array[:, 6], feat_value_array[:, 7])
+    ax_4.scatter(feat_zcr[:, 0], feat_zcr[:, 1])
     ax_4.set_title('ZCR')
     for i, txt in enumerate(annotaion):
-        ax_4.annotate(txt, (feat_value_array[i, 6], feat_value_array[i, 7]))
+        ax_4.annotate(txt, (feat_zcr[i, 0], feat_zcr[i, 1]))
 
-    ax_5 = fig.add_subplot(235)
-    ax_5.scatter(feat_value_array_umap_o_time[:, 0], feat_value_array_umap_o_time[:, 1])
-    ax_5.set_title('UMAP without time')
-    for i, txt in enumerate(annotaion[:6]):
-        ax_5.annotate(txt, (feat_value_array_umap_o_time[i, 0], feat_value_array_umap_o_time[i, 1]))
-
-    ax_6 = fig.add_subplot(236)
+    ax_6 = fig.add_subplot(235)
     ax_6.scatter(feat_value_array_umap[:, 0], feat_value_array_umap[:, 1])
     ax_6.set_title('UMAP')
     for i, txt in enumerate(annotaion):

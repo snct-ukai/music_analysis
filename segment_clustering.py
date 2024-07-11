@@ -12,8 +12,9 @@ def ward(data : np.ndarray, N = 7, ax = None) -> np.ndarray:
     from sklearn.cluster import AgglomerativeClustering
     ward = AgglomerativeClustering(n_clusters=N, linkage='ward').fit(data)
     labels = ward.labels_
-    z = linkage(data, method='ward')
-    dendrogram(z, ax=ax)
+    if ax is not None:
+        z = linkage(data, method='ward')
+        dendrogram(z, ax=ax)
     return labels
 
 # 群平均法
@@ -21,8 +22,9 @@ def average(data : np.ndarray, N = 7, ax = None) -> np.ndarray:
     from sklearn.cluster import AgglomerativeClustering
     average = AgglomerativeClustering(n_clusters=N, linkage='average').fit(data)
     labels = average.labels_
-    z = linkage(data, method='average')
-    dendrogram(z, ax=ax)
+    if ax is not None:
+        z = linkage(data, method='average')
+        dendrogram(z, ax=ax)
     return labels
 
 # 重心法
@@ -30,8 +32,9 @@ def centroid(data : np.ndarray, N = 7, ax = None) -> np.ndarray:
     from sklearn.cluster import AgglomerativeClustering
     centroid = AgglomerativeClustering(n_clusters=N, linkage='complete').fit(data)
     labels = centroid.labels_
-    z = linkage(data, method='centroid')
-    dendrogram(z, ax=ax)
+    if ax is not None:
+        z = linkage(data, method='centroid')
+        dendrogram(z, ax=ax)
     return labels
 
 # メディアン法
@@ -39,8 +42,9 @@ def median(data : np.ndarray, N = 7, ax = None) -> np.ndarray:
     from sklearn.cluster import AgglomerativeClustering
     median = AgglomerativeClustering(n_clusters=N, linkage='single').fit(data)
     labels = median.labels_
-    z = linkage(data, method='median')
-    dendrogram(z, ax=ax)
+    if ax is not None:
+        z = linkage(data, method='median')
+        dendrogram(z, ax=ax)
     return labels
 
 def xmeans(data : np.ndarray) -> np.ndarray:
@@ -120,6 +124,12 @@ def kullback_leibler_divergence(data: np.ndarray) -> np.ndarray:
         labels[i] = np.argmin(kl_divergence[i])
     return labels
 
+def k_shape(data: np.ndarray, N = 7) -> np.ndarray:
+    from tslearn.clustering import KShape
+    ks = KShape(n_clusters=N)
+    labels = ks.fit_predict(data)
+    return labels
+
 if __name__ == "__main__":
     import sys
     import wave
@@ -130,7 +140,9 @@ if __name__ == "__main__":
     filePath = sys.argv[1]
     segments = wav_separate(filePath)
     sr = wave.open(filePath, "rb").getframerate()
-    feat_value_array = calc_feat_value.calc_distribution(segments, sr)[:,2:4]
+    feat_value_array = calc_feat_value.calc_distribution(segments, sr)
+    #  use f0 and time
+    feat_value_array = feat_value_array[:, [2, 3, 8]]
 
     fig = plt.figure()
     ax_1 = fig.add_subplot(221)
@@ -147,9 +159,3 @@ if __name__ == "__main__":
     median(feat_value_array, 2, ax=ax_4)
     ax_4.set_title('Median')
     plt.show()
-
-    #labels = hdbscan(feat_value_array)
-    #color_array = ['r', 'g', 'b', 'c', 'm', 'y', 'k', 'w', 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'z', 'x', 'c', 'v', 'b', 'n', 'm']
-    #for i in range(feat_value_array.shape[0]):
-    #    plt.scatter(feat_value_array[i, 0], feat_value_array[i, 1], color=color_array[labels[i]])
-    #plt.show()
