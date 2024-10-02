@@ -1,0 +1,10 @@
+version: '3'
+
+services:
+  python:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ".:/app"
+    command: python inference.py --input /app/music.wav --gpu 0
