@@ -82,7 +82,7 @@ if __name__ == "__main__":
     segments = wav_separate(filePath)
     with wave.open(filePath, 'r') as wf:
         sr = wf.getframerate()
-    feat_value_array = calc_distribution(segments, sr)
+    feat_value_array = calc_distribution(segments, sr)[4:16]
 
     reducer = umap.UMAP(n_components=2, random_state=42)
     feat_value_array_umap = reducer.fit_transform(feat_value_array)

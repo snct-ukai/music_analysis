@@ -1,9 +1,8 @@
 from wav_separate import wav_separate
 import numpy as np
-from segment_clustering import kmeans, ward, average, centroid, median, xmeans, k_shape
+from segment_clustering import kmeans, ward, average, centroid, median, k_shape, gmm, single, complete
 import calc_feat_value
 import wave
-import pickle
 import matplotlib.pyplot as plt
 
 def segment_clustering(filePath):
@@ -51,6 +50,15 @@ def clustering(feat_value_array, mode = "ward", N = 2, is_plt = False):
     if mode.count("k_shape") > 0:
         clustering_methods.append(k_shape)
         titles.append("KShape")
+    if mode.count("gmm") > 0:
+        clustering_methods.append(gmm)
+        titles.append("GMM")    
+    if mode.count("single") > 0:
+        clustering_methods.append(single)
+        titles.append("Single")
+    if mode.count("complete") > 0:
+        clustering_methods.append(complete)
+        titles.append("Complete")
     
     if is_plt:
         fig = plt.figure()

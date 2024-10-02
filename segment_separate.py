@@ -101,7 +101,7 @@ def segment_separate(filepath):
     change_points = np.where(combined_score > dynamic_threshold)[0]
 
     # 始めの2小節は変化点として検出されやすいので除外
-    change_points = change_points[change_points > measure_length / hop_length]
+    #change_points = change_points[change_points > measure_length / hop_length]
 
     #change_points_value = np.abs(combined_score[change_points] - local_mean[change_points])
 
@@ -125,7 +125,7 @@ def segment_separate(filepath):
 
     # 短いセグメントを統合するロジック
     from util.matrix import cos_sim
-    threshold = 0.96
+    threshold = 0.98
     def should_merge_segments(seg1_start, seg1_end, seg2_start, seg2_end, mfcc, chroma, spectral_contrast, tonnetz, 
                               mfcc_threshold=threshold, chroma_threshold=threshold, spectral_contrast_threshold=threshold, 
                               tonnetz_threshold=threshold):
@@ -209,10 +209,7 @@ def segment_separate(filepath):
     return np.array(filtered_change_samples) / sr
 
 if __name__ == '__main__':
-    # 音声ファイルの読み込み
-    audioFileDir = "./wav"
-    # get audio file paths
-    audioFiles = librosa.util.find_files(audioFileDir)
-    filepath = audioFiles[0]
+    import sys
+    filepath = sys.argv[1]
     segment_time = segment_separate(filepath)
     print(segment_time)

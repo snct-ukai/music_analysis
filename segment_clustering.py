@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.cluster.hierarchy import linkage, dendrogram
+from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
 
 def kmeans(data : np.ndarray, N = 7) -> np.ndarray:
     from sklearn.cluster import KMeans
@@ -9,41 +9,49 @@ def kmeans(data : np.ndarray, N = 7) -> np.ndarray:
 
 # ウォード法
 def ward(data : np.ndarray, N = 7, ax = None) -> np.ndarray:
-    from sklearn.cluster import AgglomerativeClustering
-    ward = AgglomerativeClustering(n_clusters=N, linkage='ward').fit(data)
-    labels = ward.labels_
+    z = linkage(data, method='ward')
+    labels = fcluster(z, N, criterion='maxclust') - 1
     if ax is not None:
-        z = linkage(data, method='ward')
         dendrogram(z, ax=ax)
     return labels
 
 # 群平均法
 def average(data : np.ndarray, N = 7, ax = None) -> np.ndarray:
-    from sklearn.cluster import AgglomerativeClustering
-    average = AgglomerativeClustering(n_clusters=N, linkage='average').fit(data)
-    labels = average.labels_
+    z = linkage(data, method='average')
+    labels = fcluster(z, N, criterion='maxclust') - 1
     if ax is not None:
-        z = linkage(data, method='average')
         dendrogram(z, ax=ax)
     return labels
 
 # 重心法
 def centroid(data : np.ndarray, N = 7, ax = None) -> np.ndarray:
-    from sklearn.cluster import AgglomerativeClustering
-    centroid = AgglomerativeClustering(n_clusters=N, linkage='complete').fit(data)
-    labels = centroid.labels_
+    z = linkage(data, method='centroid')
+    labels = fcluster(z, N, criterion='maxclust') - 1
     if ax is not None:
-        z = linkage(data, method='centroid')
         dendrogram(z, ax=ax)
     return labels
 
 # メディアン法
 def median(data : np.ndarray, N = 7, ax = None) -> np.ndarray:
-    from sklearn.cluster import AgglomerativeClustering
-    median = AgglomerativeClustering(n_clusters=N, linkage='single').fit(data)
-    labels = median.labels_
+    z = linkage(data, method='median')
+    labels = fcluster(z, N, criterion='maxclust') - 1
     if ax is not None:
-        z = linkage(data, method='median')
+        dendrogram(z, ax=ax)
+    return labels
+
+# 単純連結法
+def single(data : np.ndarray, N = 7, ax = None) -> np.ndarray:
+    z = linkage(data, method='single')
+    labels = fcluster(z, N, criterion='maxclust') - 1
+    if ax is not None:
+        dendrogram(z, ax=ax)
+    return labels
+
+# 完全連結法
+def complete(data : np.ndarray, N = 7, ax = None) -> np.ndarray:
+    z = linkage(data, method='complete')
+    labels = fcluster(z, N, criterion='maxclust') - 1
+    if ax is not None:
         dendrogram(z, ax=ax)
     return labels
 
@@ -65,6 +73,12 @@ def hdbscan(data : np.ndarray) -> np.ndarray:
     clusterer = hdbscan.HDBSCAN(min_cluster_size=5, gen_min_span_tree=True)
     clusterer.fit(data)
     return clusterer.labels_
+
+def gmm(data : np.ndarray, N = 7) -> np.ndarray:
+    from sklearn.mixture import GaussianMixture
+    gmm = GaussianMixture(n_components=N).fit(data)
+    labels = gmm.predict(data)
+    return labels
 
 def kullback_leibler_divergence(data: np.ndarray) -> np.ndarray:
     # 多次元ベクトルのKullback-Leiblerダイバージェンスを計算
