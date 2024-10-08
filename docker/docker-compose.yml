@@ -7,4 +7,4 @@ services:
       dockerfile: Dockerfile
     volumes:
       - "./app/:/app/"
-    command: python inference.py --input /app/music.wav --gpu 0
+    command: python vocal-remover/inference.py --input /app/music.wav --gpu 0
