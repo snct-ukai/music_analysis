@@ -6,5 +6,5 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - ".:/app"
+      - "./app/:/app/"
     command: python inference.py --input /app/music.wav --gpu 0

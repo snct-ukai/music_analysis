@@ -1,6 +1,7 @@
 FROM python:3.9
 
-WORKDIR /app
+ENV https_proxy "http://http-p.srv.cc.suzuka-ct.ac.jp:8080"
+ENV http_proxy "http://http-p.srv.cc.suzuka-ct.ac.jp:8080"
 
 RUN apt-get update && apt-get install -y git && apt-get clean
 
