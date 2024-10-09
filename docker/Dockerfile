@@ -1,4 +1,4 @@
-FROM python:3.9
+FROM nvcr.io/nvidia/pytorch:24.09-py3
 
 ENV https_proxy "http://http-p.srv.cc.suzuka-ct.ac.jp:8080"
 ENV http_proxy "http://http-p.srv.cc.suzuka-ct.ac.jp:8080"
