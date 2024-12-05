@@ -1,19 +1,13 @@
 import librosa
 import numpy as np
 import os
-from segment_separate import segment_separate
+from segment_separate import segment_separate_from_data
 import sys
 import wave
 import soundfile as sf
 
-def wav_separate(filePath):
-    # オーディオファイルの最高サンプリングレートを取得
-    with wave.open(filePath, "rb") as wf:
-        sampleRate = wf.getframerate()
-
-    # オーディオファイルの読み込み
-    y, _ = librosa.load(filePath, sr=sampleRate)
-    segment_time = segment_separate(filePath)
+def wav_separate_from_data(data, sr, filePath):
+    segment_time = segment_separate_from_data(data, sr, filePath, saveFig=True)
 
     dirname = "segments"
     filename = os.path.basename(filePath)
@@ -28,15 +22,27 @@ def wav_separate(filePath):
     # オーディオファイルの分割
     segments_file = []
     for i in range(len(segment_time) - 1):
-        segment = y[int(segment_time[i] * sampleRate):int(segment_time[i + 1] * sampleRate)]
+        segment = data[int(segment_time[i] * sr):int(segment_time[i + 1] * sr)]
         rms = librosa.feature.rms(y = segment)
         if np.mean(rms) < 0.01:
+            del segment
             continue
         segment = np.array(segment)
         segments_file.append(segment)
-        sf.write(f"{output_dir}/segment_{i}.wav", segment, sampleRate)
+        sf.write(f"{output_dir}/segment_{i}.wav", segment, sr)
+        del segment
     
     return segments_file
+
+
+def wav_separate(filePath):
+    # オーディオファイルの最高サンプリングレートを取得
+    with wave.open(filePath, "rb") as wf:
+        sampleRate = wf.getframerate()
+
+    # オーディオファイルの読み込み
+    y, _ = librosa.load(filePath, sr=sampleRate)
+    return wav_separate_from_data(y, sampleRate, filePath)
 
 if __name__ == "__main__":
     try:

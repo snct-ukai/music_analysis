@@ -133,3 +133,20 @@ if __name__ == "__main__":
     for i, segment in enumerate(new_segments):
         sf.write(f"{output_dir}/_segment_{i}.wav", segment, sr)
     print("Output files are saved in " + output_dir)
+
+    
+    import matplotlib.pyplot as plt
+    plt.figure()
+    separate_points = [0]
+    for i in range(len(new_segments)):
+        separate_points.append(separate_points[-1] + len(new_segments[i]))
+    separate_points = separate_points[1:]
+    
+    with wave.open(filePath, "rb") as wf:
+        sampleRate = wf.getframerate()
+    y, sr = librosa.load(filePath, sr=sampleRate)
+    plt.plot(y)
+    for i in range(len(separate_points)):
+        plt.axvline(x=separate_points[i], color="red")
+    plt.savefig(f"{output_dir}/separate_points.png")
+    plt.show()

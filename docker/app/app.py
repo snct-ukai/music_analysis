@@ -2,10 +2,16 @@ from spleeter.separator import Separator
 import sys
 
 if __name__ == '__main__':
-    # インプット音源ファイルを指定
-    input_file = "./audio_example.mp3"
+    try:
+        input_file = sys.argv[1]
+    except:
+        print("Usage: python app.py <input_file>")
+        sys.exit(1)
     # 分離モードを指定
-    separator = Separator("spleeter:2stems")
+
+    filename = input_file.split("/")[-1]
+    filename = filename.split(".")[0]
+    separator = Separator("spleeter:4stems")
 
     # インプットファイルと出力ディレクトリを指定して分離実行
-    separator.separate_to_file(input_file, "./output-python")
+    separator.separate_to_file(input_file, f"./output-python/{filename}")

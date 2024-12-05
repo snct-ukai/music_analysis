@@ -7,3 +7,10 @@ __pycache__
 /output*
 
 /chatGPT
+/merged_segments
+/pretrained_models
+/separate_data
+/segments
+/tmp
+/docker/app/output*
+docker/app/pretrained_models

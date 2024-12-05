@@ -2,13 +2,23 @@ import numpy as np
 import librosa
 import soundfile as sf
 import matplotlib.pyplot as plt
+import tensorflow as tf
+from spleeter.separator import Separator
+import gc
 
-def segment_separate(filepath):
-    y, sr = librosa.load(filepath)
-
+def segment_separate_from_data(y, sr, filepath, saveFig=False):
+    import re
+    filename = re.split(r'[/\\]', filepath)[-1].split('.')[0]
+    # save y in file
+    savename = f'./tmp/{filename}.wav'
+    sf.write(savename, y, sr)
+    model = Separator('spleeter:2stems')
+    model.separate_to_file(savename, f'./tmp/')
+    del model
+    y, sr = librosa.load(f'./tmp/{filename}/accompaniment.wav')
+    
     # テンポとビートの検出
-    tempo, beats = librosa.beat.beat_track(y=y, sr=sr)
-    beat_frames = librosa.frames_to_samples(beats)
+    tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
 
     # 1小節の長さを計算
     beats_per_measure = 4  # 4拍子として
@@ -88,31 +98,39 @@ def segment_separate(filepath):
         np.abs(spectral_flux_diff)
     )
 
+    # Box-Cox変換
+    from scipy.stats import boxcox
+    combined_score = boxcox(combined_score + 1)[0]
+
     # 局所的な平均と標準偏差を計算
+    def valid_convolve(xx, size):
+        import math
+        b = np.ones(size)/size
+        xx_mean = np.convolve(xx, b, mode="same")
+
+        n_conv = math.ceil(size/2)
+
+        # 補正部分
+        xx_mean[0] *= size/n_conv
+        for i in range(1, n_conv):
+            xx_mean[i] *= size/(i+n_conv)
+            xx_mean[-i] *= size/(i + n_conv - (size % 2)) 
+	    # size%2は奇数偶数での違いに対応するため
+
+        return xx_mean
     window_size = int(len(combined_score) / (len(y) / sr) * (tempo / 60 * 8))  # 窓サイズ
-    local_mean = np.convolve(combined_score, np.ones(window_size) / window_size, mode='same')
-    local_std = np.sqrt(np.convolve((combined_score - local_mean)**2, np.ones(window_size) / window_size, mode='same'))
+    local_mean = valid_convolve(combined_score, window_size)
+    local_std = np.sqrt(valid_convolve((combined_score - local_mean[:len(combined_score)])**2, window_size))
 
     # 動的な閾値を設定
     n = 2.
     dynamic_threshold  = local_mean + n * local_std
 
     # 変化点の検出
-    change_points = np.where(combined_score > dynamic_threshold)[0]
-
-    # 始めの2小節は変化点として検出されやすいので除外
-    #change_points = change_points[change_points > measure_length / hop_length]
-
-    #change_points_value = np.abs(combined_score[change_points] - local_mean[change_points])
-
-    ## change_pointsの配列で、もしwindow_sizeにおさまる範囲に複数の候補がある場合、の最大値のみ残す、1フレームずつずらす
-    #for i in range(len(change_points) - window_size):
-    #    if np.all(change_points_value[i:i+window_size] < change_points_value[i+1:i+window_size+1]):
-    #        change_points[i] = 0
-
-    # 大きい順に上位50個を取得
-    #change_points = change_points[np.argsort(change_points_value)[::-1]][:400]
-    #change_points = np.sort(change_points)
+    # 前後のwindow_size分は変化点としない
+    # combined_score[:window_size] = 0
+    # combined_score[-window_size:] = 0
+    change_points = np.where(combined_score > dynamic_threshold[:len(combined_score)])[0]
 
     # 変化点をサンプル単位に変換
     change_samples = change_points * hop_length
@@ -175,17 +193,30 @@ def segment_separate(filepath):
     # 最後の変化点を追加
     filtered_change_samples.append(change_samples[-1])
     
-    if __name__ == '__main__':
-        import os
-        filename = os.path.basename(filepath)
-        # 拡張子を削除
-        filename = os.path.splitext(filename)[0]
-        dirname = f'./output2/{filename}'
-        if(os.path.exists(dirname) == True):
-            # delete files
-            for file in os.listdir(dirname):
+    import os
+    filename = os.path.basename(filepath)
+    # 拡張子を削除
+    filename = os.path.splitext(filename)[0]
+    dirname = f'./output2/{filename}'
+    if(os.path.exists(dirname) == True):
+        # delete files
+        for file in os.listdir(dirname):
+            if(file.endswith('.wav')):
                 os.remove(os.path.join(dirname, file))
-        os.makedirs(dirname, exist_ok=True)
+    os.makedirs(dirname, exist_ok=True)
+    
+    if saveFig:
+        # 結果をプロット
+        import time
+        plt.figure(figsize=(16, 9))
+        plt.plot(combined_score, label='Combined Score')
+        plt.plot(dynamic_threshold, label='Dynamic Threshold', linestyle='dashed', color='red')
+        plt.vlines(use_change_points, 0, max(combined_score), color='brown', linewidth=3)
+        plt.savefig(f'{dirname}/{time.time()}change_points.png', format='png', dpi=600)
+        del time
+        plt.close()
+
+    if __name__ == '__main__':
         # セグメントごとにファイルに保存
         for i in range(len(filtered_change_samples) - 1):
             start_sample = filtered_change_samples[i]
@@ -196,20 +227,40 @@ def segment_separate(filepath):
             sf.write(output_filename, segment, sr)
             print(f'Saved {output_filename}')
 
-        # 結果をプロット
-        plt.figure(figsize=(14, 5))
-        plt.plot(combined_score, label='Combined Score')
-        plt.plot(dynamic_threshold, label='Dynamic Threshold', linestyle='dashed', color='red')
-        plt.plot(local_mean, label='Local Mean', linestyle='dashed', color='green')
-        plt.vlines(change_points, 0, max(combined_score), color='r', linestyle='dashed')
-        plt.vlines(use_change_points, 0, max(combined_score), color='g')
-        plt.legend()
-        plt.savefig(f'{dirname}/result.png', format='png', dpi=300)
-
+    gc.collect()
     return np.array(filtered_change_samples) / sr
+
+
+def segment_separate(filepath, saveFig=False):
+    y, sr = librosa.load(filepath)
+    return segment_separate_from_data(y, sr, filepath, saveFig)    
 
 if __name__ == '__main__':
     import sys
-    filepath = sys.argv[1]
-    segment_time = segment_separate(filepath)
-    print(segment_time)
+    import os
+    import re
+    try:
+        input_file = sys.argv[1]
+    except:
+        print("Usage: python app.py <input_file>")
+        sys.exit(1)
+    # 分離モードを指定
+
+    filename = re.split(r'[/\\]', input_file)[-1]
+    print(filename)
+    filename = filename.split(".")[0]
+    print(filename)
+    dir = f"./separate_data/{filename}"
+    if(os.path.exists(dir) != True):
+        from spleeter.separator import Separator
+        separator = Separator("spleeter:2stems")
+        # インプットファイルと出力ディレクトリを指定して分離実行
+        separator.separate_to_file(input_file, "./separate_data/")
+
+    # セグメント分離
+    print(dir)
+    separated_files_name = os.listdir(dir)
+    print(separated_files_name)
+    for file_name in separated_files_name:
+        if file_name.endswith('.wav'):
+            segment_separate(f'{dir}/{file_name}', saveFig=True)
