@@ -106,7 +106,7 @@ class Separator():
             xx_mean[-i] *= size/(i + n_conv - (size % 2)) 
         return xx_mean
     
-    threshold = 0.98
+    threshold = 0.94
     @staticmethod
     def should_merge_segments(seg1_start, seg1_end, seg2_start, seg2_end, mfcc, chroma, spectral_contrast, tonnetz, 
                                   mfcc_threshold=threshold, chroma_threshold=threshold, spectral_contrast_threshold=threshold, 
@@ -146,14 +146,16 @@ class Separator():
         
         
         segment_time = []
+        from scipy.stats import boxcox
         for i in range(0, len(self.verse_time) -1, 1):
             start = int(self.verse_time[i] * sr)
             end = int(self.verse_time[i+1] * sr)
 
             feat = self.calc_feat(data[start:end], sr)
             combined_score = np.abs(feat['rms_diff']) + np.abs(feat['zcr_diff']) + np.abs(feat['spectral_flux_diff'])
-            from scipy.stats import boxcox
-            combined_score = boxcox(combined_score + 1)[0]
+            if not np.all(combined_score == combined_score[0]):
+                combined_score = boxcox(combined_score + 1)[0]
+                
             window_size = int(len(combined_score) / (len(data) / sr) * (self.tempo / 60 * 8))
             if window_size == 0:
                 seg_time = ((np.array([0, len(data[start:end])]) + start) / sr)
@@ -162,7 +164,7 @@ class Separator():
                 continue
             mean = self.valid_convolve(combined_score, window_size)
             std = self.valid_convolve((combined_score - mean)**2, window_size)**0.5
-            n = 2.
+            n = 1.5
             threshold = mean + n * std
             threshold_low = mean - n * std
 
@@ -193,12 +195,14 @@ class Separator():
                 filtered_change_samples.append(change_samples[i])
             
             seg_time = ((np.array(filtered_change_samples) + start) / sr)
+            seg_time = np.concatenate([[seg_time[0]], seg_time[1:][np.diff(seg_time) > measure_length / sr]])
             segment_time.extend(seg_time)
 
             self.combined_score = np.concatenate([self.combined_score, combined_score])
 
         self.segment_time = np.array(segment_time)
         self.segment_time = np.unique(self.segment_time)
+
         print(self.segment_time)
 
     def separate(self):
@@ -227,11 +231,11 @@ class Separator():
 
         import matplotlib.pyplot as plt
         plt.plot(self.combined_score)
-        for seg in self.segment_time:
-            plt.axvline(seg * sr / self.hop_length, color='red')
         for verse in self.verse_time:
             plt.axvline(verse * sr / self.hop_length, color='green')
-        plt.show()
+        for seg in self.segment_time:
+            plt.axvline(seg * sr / self.hop_length, color='red')
+        plt.savefig(os.path.join(save_dir, 'combined_score.png'), dpi=600)
 
 
 if __name__ == "__main__":
