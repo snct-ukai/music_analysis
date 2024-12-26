@@ -103,7 +103,7 @@ class Separator():
             xx_mean[-i] *= size/(i + n_conv - (size % 2)) 
         return xx_mean
     
-    threshold = 0.94
+    threshold = 0.96
     @staticmethod
     def should_merge_segments(seg1_start, seg1_end, seg2_start, seg2_end, mfcc, chroma, spectral_contrast, tonnetz, 
                                   mfcc_threshold=threshold, chroma_threshold=threshold, spectral_contrast_threshold=threshold, 
@@ -145,16 +145,24 @@ class Separator():
         segment_time = []
         from scipy.stats import boxcox
         for i in range(0, len(self.verse_time) -1, 1):
-            start = int(self.verse_time[i] * sr)
-            end = int(self.verse_time[i+1] * sr)
+            start_time = self.verse_time[i]
+            end_time = self.verse_time[i+1]
+            start = int(start_time * sr)
+            end = int(end_time * sr)
+
+            if(start == end):
+                continue
 
             feat = self.calc_feat(data[start:end], sr)
-            print(feat['rms'].shape, feat['zcr'].shape, feat['spectral_flux'].shape)
             combined_score = np.abs(feat['rms']) + np.abs(feat['zcr']) + np.abs(feat['spectral_flux'])
             if not np.all(combined_score == combined_score[0]):
                 combined_score = boxcox(combined_score + 1)[0]
                 
-            window_size = int(len(combined_score) / (len(data) / sr) * (self.tempo / 60 * 8))
+            window_size = int(len(combined_score) / (len(data[start:end]) / sr) * (self.tempo / 60 * 16))
+            if(window_size > len(combined_score)):
+                seg_time = (np.array([start_time, end_time]))
+                segment_time.extend(seg_time)
+                continue
             if window_size == 0:
                 seg_time = ((np.array([0, len(data[start:end])]) + start) / sr)
                 segment_time.extend(seg_time)
@@ -199,6 +207,7 @@ class Separator():
             self.combined_score = np.concatenate([self.combined_score, combined_score])
 
         self.segment_time = np.array(segment_time)
+        self.segment_time = np.concatenate([0, self.segment_time, len(self.data) / sr])
         self.segment_time = np.unique(self.segment_time)
 
         print(self.segment_time)
@@ -223,6 +232,8 @@ class Separator():
             else:
                 end = int(self.segment_time[i+1] * sr)
             save_file_path = os.path.join(save_dir, f'segment_{i}.wav')
+            if(start == end):
+                continue
             sf.write(save_file_path, self.data[start:end], sr)
 
         print("Separation is done")
