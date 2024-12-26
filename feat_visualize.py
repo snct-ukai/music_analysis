@@ -24,34 +24,41 @@ def main(filepath):
     spectral_flux = (spectral_flux - np.mean(spectral_flux)) / np.std(spectral_flux)
 
     # diff
-    rms_diff = np.diff(rms[0])
-    zcr_diff = np.diff(zcr[0])
-    spectral_flux_diff = np.diff(spectral_flux)
+    rms_diff = np.abs(np.diff(rms[0]))
+    zcr_diff = np.abs(np.diff(zcr[0]))
+    spectral_flux_diff = np.abs(np.diff(spectral_flux))
 
     # plot
-    fig, ax = plt.subplots(4, 1, figsize=(10, 10))
+    fig, ax = plt.subplots(6, 1, figsize=(10, 20))
     ax[0].plot(rms[0], label='RMS')
     ax[0].set_title('RMS')
     ax[0].set_xlabel('frame')
     ax[0].set_ylabel('RMS')
-    ax[0].legend()
-    ax[1].plot(zcr[0], label='ZCR')
-    ax[1].set_title('ZCR')
+
+    ax[1].plot(rms_diff, label='RMS diff')
+    ax[1].set_title('RMS diff')
     ax[1].set_xlabel('frame')
-    ax[1].set_ylabel('ZCR')
-    ax[1].legend()
-    ax[2].plot(spectral_flux, label='Spectral Flux')
-    ax[2].set_title('Spectral Flux')
+    ax[1].set_ylabel('RMS diff')
+
+    ax[2].plot(zcr[0], label='ZCR')
+    ax[2].set_title('ZCR')
     ax[2].set_xlabel('frame')
-    ax[2].set_ylabel('Spectral Flux')
-    ax[2].legend()
-    ax[3].plot(rms_diff, label='RMS Diff')
-    ax[3].plot(zcr_diff, label='ZCR Diff')
-    ax[3].plot(spectral_flux_diff, label='Spectral Flux Diff')
-    ax[3].set_title('Diff')
+    ax[2].set_ylabel('ZCR')
+
+    ax[3].plot(zcr_diff, label='ZCR diff')
+    ax[3].set_title('ZCR diff')
     ax[3].set_xlabel('frame')
-    ax[3].set_ylabel('Diff')
-    ax[3].legend()
+    ax[3].set_ylabel('ZCR diff')
+
+    ax[4].plot(spectral_flux, label='Spectral Flux')
+    ax[4].set_title('Spectral Flux')
+    ax[4].set_xlabel('frame')
+    ax[4].set_ylabel('Spectral Flux')
+
+    ax[5].plot(spectral_flux_diff, label='Spectral Flux diff')
+    ax[5].set_title('Spectral Flux diff')
+    ax[5].set_xlabel('frame')
+    ax[5].set_ylabel('Spectral Flux diff')
 
     plt.tight_layout()
     save_dir = "./output/feat_visualize"
@@ -60,4 +67,8 @@ def main(filepath):
     plt.savefig(save_path, dpi=600)
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    dir_path = sys.argv[1]
+    for filename in os.listdir(dir_path):
+        if filename.endswith(".wav"):
+            filepath = os.path.join(dir_path, filename)
+            main(filepath)
