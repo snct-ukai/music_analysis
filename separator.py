@@ -50,10 +50,7 @@ class Separator():
         self.verse_time = np.array(verse) * self.hop_length / sr
 
     def calc_feat(self, data, sr):
-        rms = np.array([
-            sum(abs(data[i:i+2048]**2))
-            for i in range(0, len(data), 512)
-        ])
+        rms = librosa.feature.rms(y=data, frame_length=self.frame_length, hop_length=self.hop_length)[0]
         zcr = librosa.feature.zero_crossing_rate(data, frame_length=self.frame_length, hop_length=self.hop_length)[0]
         stft = librosa.stft(data, n_fft=self.frame_length, hop_length=self.hop_length)
         spectral_flux = np.sqrt(
@@ -63,7 +60,7 @@ class Separator():
         chroma = librosa.feature.chroma_stft(y = data, sr=sr, hop_length=self.hop_length)
         spectral_contrast = librosa.feature.spectral_contrast(y = data, sr=sr, hop_length=self.hop_length)
         tonnetz = librosa.feature.tonnetz(y = data, sr=sr, hop_length=self.hop_length)
-        min_length = min(len(rms), len(zcr), stft.shape[1], mfcc.shape[1], chroma.shape[1], spectral_contrast.shape[1], tonnetz.shape[1])
+        min_length = min(len(rms), len(zcr), stft.shape[1], mfcc.shape[1], chroma.shape[1], spectral_contrast.shape[1], tonnetz.shape[1], len(spectral_flux))
         # trim
         rms = rms[:min_length]
         zcr = zcr[:min_length]
@@ -152,7 +149,8 @@ class Separator():
             end = int(self.verse_time[i+1] * sr)
 
             feat = self.calc_feat(data[start:end], sr)
-            combined_score = np.abs(feat['rms_diff']) + np.abs(feat['zcr_diff']) + np.abs(feat['spectral_flux_diff'])
+            print(feat['rms'].shape, feat['zcr'].shape, feat['spectral_flux'].shape)
+            combined_score = np.abs(feat['rms']) + np.abs(feat['zcr']) + np.abs(feat['spectral_flux'])
             if not np.all(combined_score == combined_score[0]):
                 combined_score = boxcox(combined_score + 1)[0]
                 
@@ -164,7 +162,7 @@ class Separator():
                 continue
             mean = self.valid_convolve(combined_score, window_size)
             std = self.valid_convolve((combined_score - mean)**2, window_size)**0.5
-            n = 1.5
+            n = 2.
             threshold = mean + n * std
             threshold_low = mean - n * std
 
