@@ -15,7 +15,8 @@ python version : 3.10
 ```bash
 pip install -r requirements.txt
 ```
-separator.pyに解析したい音楽ファイルのパスを指定して実行すると、その音楽ファイルのコード進行を解析します。
+separator.pyに解析したい音楽ファイルのパスを指定して実行すると、その音楽ファイルのセクションを推定して保存します。
+保存フォルダは`/output`です。
 ```bash
 python separator.py /path/to/music/file
 ```
