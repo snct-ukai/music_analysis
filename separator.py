@@ -89,6 +89,7 @@ class Separator():
             zcr_diff=zcr_diff,
             spectral_flux_diff=spectral_flux_diff
         )
+    
     @staticmethod
     def valid_convolve(xx, size):
         import math
@@ -130,8 +131,6 @@ class Separator():
             tonnetz_cos_sim > tonnetz_threshold
         )
             
-        
-
     def detect_segment(self):
         if self.verse_time is None:
             raise Exception("Verse time is not detected")
@@ -207,7 +206,7 @@ class Separator():
             self.combined_score = np.concatenate([self.combined_score, combined_score])
 
         self.segment_time = np.array(segment_time)
-        self.segment_time = np.concatenate([0, self.segment_time, len(self.data) / sr])
+        self.segment_time = np.concatenate([[0], self.segment_time, [len(self.data) / sr]])
         self.segment_time = np.unique(self.segment_time)
 
         print(self.segment_time)
