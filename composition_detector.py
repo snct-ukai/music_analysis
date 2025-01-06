@@ -11,8 +11,8 @@ def composition_detector(y : np.ndarray, sr : int) -> Tuple[np.ndarray, np.ndarr
     onset_env = librosa.onset.onset_strength(y=y, sr=sr)
     y = librosa.effects.trim(y)[0]
     beat : np.ndarray = librosa.beat.beat_track(onset_envelope=onset_env, sr=sr)[1]
-    beat_time = librosa.frames_to_time(beat, sr=sr)
-    normalize_wave = np.zeros(y.size)
+    #beat_time = librosa.frames_to_time(beat, sr=sr)
+    #normalize_wave = np.zeros(y.size)
     window_size = int(sr * 0.004)
 
     future_list = []
@@ -20,8 +20,8 @@ def composition_detector(y : np.ndarray, sr : int) -> Tuple[np.ndarray, np.ndarr
     with ThreadPoolExecutor() as executor:
         mfcc_res = executor.submit(mf.calc, y, sr)
         future_list.append(mfcc_res)
-        normalize_wave = executor.submit(nw.calc, y, sr, beat_time)
-        future_list.append(normalize_wave)
+        #normalize_wave = executor.submit(nw.calc, y, sr, beat_time)
+        #future_list.append(normalize_wave)
         zcr_sst = executor.submit(zcr.calc, y, sr)
         future_list.append(zcr_sst)
         spectral_rolloff_sst = executor.submit(sro.calc, y, sr)
@@ -36,7 +36,7 @@ def composition_detector(y : np.ndarray, sr : int) -> Tuple[np.ndarray, np.ndarr
 
         _ = futures.wait(future_list)
 
-    normalize_wave = normalize_wave.result()
+    #normalize_wave = normalize_wave.result()
     zcr_sst = zcr_sst.result()
     spectral_rolloff_sst = spectral_rolloff_sst.result()
     rms_res = rms_res.result()
@@ -48,20 +48,20 @@ def composition_detector(y : np.ndarray, sr : int) -> Tuple[np.ndarray, np.ndarr
     rms = rms_res[0]
     rms_sst = rms_res[1]
 
-    for i in range(mfcc_cos_sim_sst.size):
-        mfcc_cos_sim_sst[i] *= normalize_wave[int(i * normalize_wave.size // mfcc_cos_sim_sst.size)]
-    for i in range(zcr_sst.size):
-        zcr_sst[i] *= normalize_wave[int(i * normalize_wave.size // zcr_sst.size)]
-    for i in range(spectral_rolloff_sst.size):
-        spectral_rolloff_sst[i] *= normalize_wave[int(i * normalize_wave.size // spectral_rolloff_sst.size)]
-    for i in range(rms_sst.size):
-        rms_sst[i] *= normalize_wave[int(i * normalize_wave.size // rms_sst.size)]
-    for i in range(spectral_centroid_sst.size):
-        spectral_centroid_sst[i] *= normalize_wave[int(i * normalize_wave.size // spectral_centroid_sst.size)]
-    for i in range(spectral_bandwidth_sst.size):
-        spectral_bandwidth_sst[i] *= normalize_wave[i * normalize_wave.size // spectral_bandwidth_sst.size]
-    for i in range(chroma_sst.size):
-        chroma_sst[i] *= normalize_wave[i * normalize_wave.size // chroma_sst.size]
+    #for i in range(mfcc_cos_sim_sst.size):
+    #    mfcc_cos_sim_sst[i] *= normalize_wave[int(i * normalize_wave.size // mfcc_cos_sim_sst.size)]
+    #for i in range(zcr_sst.size):
+    #    zcr_sst[i] *= normalize_wave[int(i * normalize_wave.size // zcr_sst.size)]
+    #for i in range(spectral_rolloff_sst.size):
+    #    spectral_rolloff_sst[i] *= normalize_wave[int(i * normalize_wave.size // spectral_rolloff_sst.size)]
+    #for i in range(rms_sst.size):
+    #    rms_sst[i] *= normalize_wave[int(i * normalize_wave.size // rms_sst.size)]
+    #for i in range(spectral_centroid_sst.size):
+    #    spectral_centroid_sst[i] *= normalize_wave[int(i * normalize_wave.size // spectral_centroid_sst.size)]
+    #for i in range(spectral_bandwidth_sst.size):
+    #    spectral_bandwidth_sst[i] *= normalize_wave[i * normalize_wave.size // spectral_bandwidth_sst.size]
+    #for i in range(chroma_sst.size):
+    #    chroma_sst[i] *= normalize_wave[i * normalize_wave.size // chroma_sst.size]
 
     ### メロディ変化点検出
     # 各パラメータの変化点検出結果を合成
@@ -77,8 +77,8 @@ def composition_detector(y : np.ndarray, sr : int) -> Tuple[np.ndarray, np.ndarr
     wave_sum = wave_sum / np.max(wave_sum) # 正規化
     wave_sum_sst = ad.sst(wave_sum, window_size // 2) # 合成した変化点検出結果に対して異常検知
     # ビートごとに山が来る正規分布の列で作られた波との積を取る
-    for i in range(wave_sum_sst.size):
-        wave_sum_sst[i] *= normalize_wave[i * normalize_wave.size // wave_sum_sst.size]
+    #for i in range(wave_sum_sst.size):
+    #    wave_sum_sst[i] *= normalize_wave[i * normalize_wave.size // wave_sum_sst.size]
     wave_sum_sst = low_pass_filter(wave_sum_sst, sr) # ローパスフィルタ
     wave_sum_sst = wave_sum_sst / np.max(wave_sum_sst) * 2 
     wave_sum_sst = np.exp(wave_sum_sst) # 指数関数で変化点を増幅
