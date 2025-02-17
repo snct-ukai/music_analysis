@@ -1,2 +1,0 @@
-spleeter
-ffmpeg-python

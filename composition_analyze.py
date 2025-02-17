@@ -6,6 +6,7 @@ import matplotlib as mpl
 from freq_analyze import mfcc
 from util import anomaly_detection
 import sys
+import re
 
 mpl.rcParams['axes.xmargin'] = 0
 mpl.rcParams['axes.ymargin'] = 0
@@ -27,7 +28,10 @@ import soundfile as sf
 import os
 sr = sf.info(sys.argv[1]).samplerate
 y, _ = librosa.load(sys.argv[1], sr=sr)
-output_dir = f'./output/sst/{sys.argv[1].split("/")[-1].split(".")[0]}'
+filepath = sys.argv[1]
+filename = re.split(r'[/\\]', filepath)[-1].split('.')[0]
+output_dir = f'./output/sst/{filename}'
+print(output_dir)
 os.makedirs(output_dir, exist_ok=True)
 for i in range(len(segments) - 1):
     output_file_name = os.path.join(output_dir, f'{i}.wav')

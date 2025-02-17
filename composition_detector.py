@@ -90,4 +90,18 @@ def composition_detector(y : np.ndarray, sr : int) -> Tuple[np.ndarray, np.ndarr
 
     change_point_index = np.argwhere(delta_wave_sum_sst > 0.05)
     change_point_index = change_point_index.flatten()
+
+    if __name__ == '__main__':
+        import matplotlib.pyplot as plt
+        plt.plot(wave_sum, label='wave_sum', color='black')
+        plt.plot(wave_sum_sst, label='wave_sum_sst', color='red')
+        plt.plot(delta_wave_sum_sst, label='delta_wave_sum_sst', color='blue')
+        plt.legend()
+        plt.show()
+
     return [y, change_point_index, y.size / delta_wave_sum_sst.size]
+
+if __name__ == '__main__':
+    import sys
+    y, sr = librosa.load(sys.argv[1], sr=4800)
+    y, composition_change_index, time_range = composition_detector(y, sr)
